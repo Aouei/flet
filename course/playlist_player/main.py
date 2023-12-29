@@ -31,16 +31,26 @@ class SongPlayer(UserControl):
 
         self.audio : Audio = audio
         self.song : Song = song
-    
+        self.playing : bool = False
+
+        self.title : Text = Text(self.song.title, style = flet.TextThemeStyle.TITLE_MEDIUM)
+        self.cover : Image = Image(self.song.image, width = 256)
+        self.duration : Slider = Slider(disabled = True)
+        self.play_buttom : IconButton = IconButton(content=Image(PLAY_ICON_PATH), width = 40, height = 40)
+        self.pause_buttom : IconButton = IconButton(content=Image(PAUSE_ICON_PATH), width = 40, height = 40, visible = False)
+        self.previous_buttom : IconButton = IconButton(content=Image(PREVIOUS_ICON_PATH), width = 40, height = 40)
+        self.next_buttom : IconButton = IconButton(content=Image(NEXT_ICON_PATH), width = 40, height = 40)
+
+
     def build(self):
         return Column([
-            Text(self.song.title, style = flet.TextThemeStyle.TITLE_MEDIUM),
-            Image(self.song.image, width = 256),
-            Slider(width = 512),
-            Row([IconButton(content=Image(PREVIOUS_ICON_PATH), width = 40, height = 40),
-                 IconButton(content=Image(PLAY_ICON_PATH), width = 40, height = 40), 
-                 IconButton(content=Image(NEXT_ICON_PATH), width = 40, height = 40)],
-                 alignment = 'center')
+            self.title,
+            self.cover,
+            self.duration,
+            Row([self.previous_buttom,
+                 self.play_buttom,
+                 self.pause_buttom,
+                 self.next_buttom], alignment = 'center')
         ], horizontal_alignment = 'center', width = 768)
 
 
