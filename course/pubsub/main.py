@@ -18,11 +18,9 @@ def main(page : Page):
 
     def send_A(event):
         page.pubsub.send_all_on_topic('A', 'Hey A')
-        page.update()
 
     def send_B(event):
         page.pubsub.send_all_on_topic('B', 'Hey B')
-        page.update()
 
     page.pubsub.subscribe_topic('A', receive_A)
     page.pubsub.subscribe_topic('B', receive_B)
