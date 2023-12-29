@@ -31,6 +31,8 @@ class SongPlayer(UserControl):
 
         self.audio : Audio = audio
         self.song : Song = song
+
+        self.current_state : str | None = None
         self.playing : bool = False
 
         self.title : Text = Text(self.song.title, style = flet.TextThemeStyle.TITLE_MEDIUM)
@@ -41,6 +43,23 @@ class SongPlayer(UserControl):
         self.previous_buttom : IconButton = IconButton(content=Image(PREVIOUS_ICON_PATH), width = 40, height = 40)
         self.next_buttom : IconButton = IconButton(content=Image(NEXT_ICON_PATH), width = 40, height = 40)
 
+    def play(self, event):
+        pass
+
+    def pause(self, event):
+        pass
+
+    def update_duration(self, event):
+        pass
+
+    def step_to_milisecond(self, event):
+        pass
+
+    def next_song(self, event):
+        pass
+
+    def previous_song(self, event):
+        pass
 
     def build(self):
         return Column([
