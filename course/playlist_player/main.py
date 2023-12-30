@@ -29,13 +29,13 @@ SONGS = pd.read_csv(r'C:\Users\sergi\Documents\repos\flet\course\playlist_player
 
 
 class SongPlayer(UserControl):
-    def __init__(self, audio : Audio, song : Song):
+    def __init__(self, song : Song):
         super().__init__()
 
-        self.audio : Audio = audio
-        self.audio.on_duration_changed = self.update_duration
-
         self.song : Song = song
+
+        self.audio : Audio = Audio(src = self.song.src)
+        self.audio.on_loaded = self._set_duration_slider
 
         self.current_state : str | None = None
         self.playing : bool = False
@@ -62,6 +62,12 @@ class SongPlayer(UserControl):
 
         return mp3_file
 
+    def _set_duration_slider(self, event):
+        self.audio.on_duration_changed = self.update_duration
+        self.duration.disabled = False
+        self.duration.max = self.audio.get_duration()
+        self.update()
+
     def play(self, event):
         if not self.playing:
             mp3_file = self._load_song()
@@ -71,8 +77,6 @@ class SongPlayer(UserControl):
                 self.audio.play()
                 self.play_button.visible = False
                 self.pause_button.visible = True
-                self.duration.disabled = False
-                self.duration.max = self.audio.get_duration()
                 self.playing = True
                 self.update()
         else:
@@ -103,6 +107,7 @@ class SongPlayer(UserControl):
 
     def build(self):
         return Column([
+            self.audio,
             self.title,
             self.cover,
             self.duration,
@@ -114,11 +119,10 @@ class SongPlayer(UserControl):
 
 
 class PlaylistPlayer(UserControl):
-    def __init__(self, audio : Audio, songs : pd.DataFrame):
+    def __init__(self, songs : pd.DataFrame):
         super().__init__()
 
         self.songs : pd.DataFrame = songs
-        self.audio : Audio = audio
 
         self.current_song_index = 0
 
@@ -126,13 +130,10 @@ class PlaylistPlayer(UserControl):
         return Song(**self.songs.iloc[self.current_song_index].to_dict())
 
     def build(self):
-        return Row([SongPlayer(self.audio, self._get_song()), ListView(width = 256)])
+        return Row([SongPlayer(self._get_song()), ListView(width = 256)])
 
 
-def main(page : Page):
-    audio = Audio(src = 'https://luan.xyz/files/audio/ambient_c_motion.mp3')
-    page.overlay.append(audio)
-    
+def main(page : Page):    
     page.title = 'Playlist Player'
     page.window_width = 1024
     page.window_height = 512
@@ -142,7 +143,7 @@ def main(page : Page):
 
     page.vertical_alignment = 'center'
 
-    page.add(PlaylistPlayer(audio, SONGS))
+    page.add(PlaylistPlayer(SONGS))
 
 
 flet.app(target = main)
