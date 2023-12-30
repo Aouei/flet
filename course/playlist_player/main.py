@@ -1,6 +1,8 @@
 import flet
 import pandas as pd
+import moviepy.editor as mp
 
+from pytube import YouTube
 from dataclasses import dataclass
 from flet import Page, UserControl, Row, Column, Image, Slider, Audio, IconButton, ListView, Text
 
@@ -13,6 +15,7 @@ class Song:
 
 
 ICONS_PATH = r'C:\Users\sergi\Documents\repos\flet\course\playlist_player\assets\icons'
+SONGS_PATH = r'C:\Users\sergi\Documents\repos\flet\course\playlist_player\assets\songs'
 
 PLAY_ICON_PATH = rf'{ICONS_PATH}\play.png'
 PAUSE_ICON_PATH = rf'{ICONS_PATH}\pause.png'
@@ -30,6 +33,8 @@ class SongPlayer(UserControl):
         super().__init__()
 
         self.audio : Audio = audio
+        self.audio.on_duration_changed = self.update_duration
+
         self.song : Song = song
 
         self.current_state : str | None = None
@@ -37,23 +42,58 @@ class SongPlayer(UserControl):
 
         self.title : Text = Text(self.song.title, style = flet.TextThemeStyle.TITLE_MEDIUM)
         self.cover : Image = Image(self.song.image, width = 256)
-        self.duration : Slider = Slider(disabled = True)
-        self.play_buttom : IconButton = IconButton(content=Image(PLAY_ICON_PATH), width = 40, height = 40)
-        self.pause_buttom : IconButton = IconButton(content=Image(PAUSE_ICON_PATH), width = 40, height = 40, visible = False)
-        self.previous_buttom : IconButton = IconButton(content=Image(PREVIOUS_ICON_PATH), width = 40, height = 40)
-        self.next_buttom : IconButton = IconButton(content=Image(NEXT_ICON_PATH), width = 40, height = 40)
+        self.duration : Slider = Slider(disabled = True, on_change = self.step_to_milisecond)
+        self.play_button : IconButton = IconButton(content = Image(PLAY_ICON_PATH), width = 40, 
+                                                   height = 40, on_click = self.play)
+        self.pause_button : IconButton = IconButton(content=Image(PAUSE_ICON_PATH), width = 40, 
+                                                    height = 40, visible = False, on_click = self.pause)
+        self.previous_button : IconButton = IconButton(content=Image(PREVIOUS_ICON_PATH), width = 40, height = 40)
+        self.next_button : IconButton = IconButton(content=Image(NEXT_ICON_PATH), width = 40, height = 40)
+
+    def _load_song(self):
+        stream = YouTube(self.song.src).streams.filter(file_extension = 'mp4').first()
+        result = stream.download(output_path = SONGS_PATH)
+        mp3_file = ''
+
+        if not result == '':
+            clip = mp.VideoFileClip(result)
+            mp3_file = result.replace('.mp4', '.mp3')
+            clip.audio.write_audiofile(mp3_file)
+
+        return mp3_file
 
     def play(self, event):
-        pass
+        if not self.playing:
+            mp3_file = self._load_song()
+            
+            if mp3_file:
+                self.audio.src = mp3_file
+                self.audio.play()
+                self.play_button.visible = False
+                self.pause_button.visible = True
+                self.duration.disabled = False
+                self.duration.max = self.audio.get_duration()
+                self.playing = True
+                self.update()
+        else:
+            self.audio.resume()
+            self.play_button.visible = False
+            self.pause_button.visible = True
+            self.update()
 
     def pause(self, event):
-        pass
+        self.audio.pause()
+        self.play_button.visible = True
+        self.pause_button.visible = False
+        self.update()
 
     def update_duration(self, event):
-        pass
+        self.duration.value = self.audio.get_current_position()
+        self.update()
 
     def step_to_milisecond(self, event):
-        pass
+        self.audio.seek(int(self.duration.value))
+        self.update()
 
     def next_song(self, event):
         pass
@@ -66,10 +106,10 @@ class SongPlayer(UserControl):
             self.title,
             self.cover,
             self.duration,
-            Row([self.previous_buttom,
-                 self.play_buttom,
-                 self.pause_buttom,
-                 self.next_buttom], alignment = 'center')
+            Row([self.previous_button,
+                 self.play_button,
+                 self.pause_button,
+                 self.next_button], alignment = 'center')
         ], horizontal_alignment = 'center', width = 768)
 
 
