@@ -2,6 +2,7 @@ import flet
 import pandas as pd
 import moviepy.editor as mp
 
+from enum import Enum
 from pytube import YouTube
 from dataclasses import dataclass
 from flet import Page, UserControl, Row, Column, Image, Slider, Audio, IconButton, ListView, Text, PubSub
@@ -12,6 +13,11 @@ class Song:
     title : str
     image : str
     src : str
+
+
+class Actions(Enum):
+    NEXT_SONG : str = 'next'
+    PREV_SONG : str = 'previous'
 
 
 ICONS_PATH = r'C:\Users\sergi\Documents\repos\flet\course\playlist_player\assets\icons'
