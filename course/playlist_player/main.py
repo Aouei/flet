@@ -4,7 +4,7 @@ import moviepy.editor as mp
 
 from pytube import YouTube
 from dataclasses import dataclass
-from flet import Page, UserControl, Row, Column, Image, Slider, Audio, IconButton, ListView, Text
+from flet import Page, UserControl, Row, Column, Image, Slider, Audio, IconButton, ListView, Text, PubSub
 
 
 @dataclass
@@ -29,19 +29,18 @@ SONGS = pd.read_csv(r'C:\Users\sergi\Documents\repos\flet\course\playlist_player
 
 
 class SongPlayer(UserControl):
-    def __init__(self, song : Song):
+    def __init__(self, pubsub : PubSub, song : Song):
         super().__init__()
 
         self.song : Song = song
-
+        self.pubsub : PubSub = pubsub
         self.audio : Audio = Audio(src = self.song.src)
-        self.audio.on_loaded = self._set_duration_slider
 
         self.current_state : str | None = None
         self.playing : bool = False
 
         self.title : Text = Text(self.song.title, style = flet.TextThemeStyle.TITLE_MEDIUM)
-        self.cover : Image = Image(self.song.image, width = 256)
+        self.cover : Image = Image(self.song.image, width = 256, border_radius = flet.border_radius.all(10))
         self.duration : Slider = Slider(disabled = True, on_change = self.step_to_milisecond)
         self.play_button : IconButton = IconButton(content = Image(PLAY_ICON_PATH), width = 40, 
                                                    height = 40, on_click = self.play)
@@ -69,24 +68,26 @@ class SongPlayer(UserControl):
         self.update()
 
     def play(self, event):
-        if not self.playing:
-            mp3_file = self._load_song()
-            
-            if mp3_file:
-                self.audio.src = mp3_file
-                self.audio.play()
-                self.play_button.visible = False
-                self.pause_button.visible = True
-                self.playing = True
-                self.update()
-        else:
-            self.audio.resume()
+        mp3_file = self._load_song()
+        
+        if mp3_file:
+            self.audio.on_loaded = self._set_duration_slider
+            self.audio.src = mp3_file
+            self.audio.play()
             self.play_button.visible = False
             self.pause_button.visible = True
+            self.playing = True
             self.update()
+
+    def resume(self, event):
+        self.audio.resume()
+        self.play_button.visible = False
+        self.pause_button.visible = True
+        self.update()
 
     def pause(self, event):
         self.audio.pause()
+        self.play_button.on_click = self.resume
         self.play_button.visible = True
         self.pause_button.visible = False
         self.update()
@@ -119,10 +120,11 @@ class SongPlayer(UserControl):
 
 
 class PlaylistPlayer(UserControl):
-    def __init__(self, songs : pd.DataFrame):
+    def __init__(self, pubsub : PubSub, songs : pd.DataFrame):
         super().__init__()
 
         self.songs : pd.DataFrame = songs
+        self.pubsub : PubSub = pubsub
 
         self.current_song_index = 0
 
@@ -130,7 +132,7 @@ class PlaylistPlayer(UserControl):
         return Song(**self.songs.iloc[self.current_song_index].to_dict())
 
     def build(self):
-        return Row([SongPlayer(self._get_song()), ListView(width = 256)])
+        return Row([SongPlayer(self.pubsub, self._get_song()), ListView(width = 256)])
 
 
 def main(page : Page):    
@@ -143,7 +145,7 @@ def main(page : Page):
 
     page.vertical_alignment = 'center'
 
-    page.add(PlaylistPlayer(SONGS))
+    page.add(PlaylistPlayer(page.pubsub, SONGS))
 
 
 flet.app(target = main)
