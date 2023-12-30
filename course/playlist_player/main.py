@@ -41,6 +41,7 @@ class SongPlayer(UserControl):
         self.song : Song = song
         self.pubsub : PubSub = pubsub
         self.audio : Audio = Audio(src = self.song.src)
+        self.audio.on_state_changed = self._set_state
 
         self.current_state : str | None = None
         self.playing : bool = False
@@ -56,6 +57,9 @@ class SongPlayer(UserControl):
                                                        height = 40, on_click = self.previous_song)
         self.next_button : IconButton = IconButton(content=Image(NEXT_ICON_PATH), width = 40, 
                                                    height = 40, on_click = self.next_song)
+
+    def _set_state(self, event):
+        self.current_state = event.data
 
     def _load_song(self):
         stream = YouTube(self.song.src).streams.filter(file_extension = 'mp4').first()
@@ -161,6 +165,10 @@ class PlaylistPlayer(UserControl):
 
         self.current_song_index = (self.current_song_index + direction) % len(self.songs)
         self.song_player.set_song(self._get_song())
+
+        if self.song_player.current_state == 'playing':
+            self.song_player.play(None)
+        
         self.update()
 
     def _get_song(self) -> Song:
