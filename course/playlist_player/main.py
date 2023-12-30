@@ -52,8 +52,10 @@ class SongPlayer(UserControl):
                                                    height = 40, on_click = self.play)
         self.pause_button : IconButton = IconButton(content=Image(PAUSE_ICON_PATH), width = 40, 
                                                     height = 40, visible = False, on_click = self.pause)
-        self.previous_button : IconButton = IconButton(content=Image(PREVIOUS_ICON_PATH), width = 40, height = 40)
-        self.next_button : IconButton = IconButton(content=Image(NEXT_ICON_PATH), width = 40, height = 40)
+        self.previous_button : IconButton = IconButton(content=Image(PREVIOUS_ICON_PATH), width = 40, 
+                                                       height = 40, on_click = self.previous_song)
+        self.next_button : IconButton = IconButton(content=Image(NEXT_ICON_PATH), width = 40, 
+                                                   height = 40, on_click = self.next_song)
 
     def _load_song(self):
         stream = YouTube(self.song.src).streams.filter(file_extension = 'mp4').first()
@@ -68,9 +70,25 @@ class SongPlayer(UserControl):
         return mp3_file
 
     def _set_duration_slider(self, event):
-        self.audio.on_duration_changed = self.update_duration
+        self.audio.on_position_changed = self.update_duration
         self.duration.disabled = False
         self.duration.max = self.audio.get_duration()
+        self.update()
+
+    def set_song(self, song : Song):
+        self.audio.on_position_changed = None
+        self.song : Song = song
+        
+        self.title.value = song.title
+        self.cover.src = song.image
+
+        self.audio.release()
+        self.duration.disabled = True
+        self.duration.value = 0
+        
+        self.play_button.on_click = self.play
+        self.play_button.visible = True
+        self.pause_button.visible = False
         self.update()
 
     def play(self, event):
@@ -82,7 +100,6 @@ class SongPlayer(UserControl):
             self.audio.play()
             self.play_button.visible = False
             self.pause_button.visible = True
-            self.playing = True
             self.update()
 
     def resume(self, event):
@@ -107,10 +124,10 @@ class SongPlayer(UserControl):
         self.update()
 
     def next_song(self, event):
-        pass
+        self.pubsub.send_all_on_topic(Actions.NEXT_SONG, '')
 
     def previous_song(self, event):
-        pass
+        self.pubsub.send_all_on_topic(Actions.PREV_SONG, '')
 
     def build(self):
         return Column([
@@ -131,14 +148,26 @@ class PlaylistPlayer(UserControl):
 
         self.songs : pd.DataFrame = songs
         self.pubsub : PubSub = pubsub
-
         self.current_song_index = 0
+
+        self.song_player : SongPlayer = SongPlayer(self.pubsub, self._get_song())
+
+        self.pubsub.subscribe_topic(Actions.NEXT_SONG, self._change_song)
+        self.pubsub.subscribe_topic(Actions.PREV_SONG, self._change_song)
+
+
+    def _change_song(self, topic, message):
+        direction : int = 1 if topic == Actions.NEXT_SONG else - 1
+
+        self.current_song_index = (self.current_song_index + direction) % len(self.songs)
+        self.song_player.set_song(self._get_song())
+        self.update()
 
     def _get_song(self) -> Song:
         return Song(**self.songs.iloc[self.current_song_index].to_dict())
 
     def build(self):
-        return Row([SongPlayer(self.pubsub, self._get_song()), ListView(width = 256)])
+        return Row([self.song_player, ListView(width = 256)])
 
 
 def main(page : Page):    
