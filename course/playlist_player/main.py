@@ -2,13 +2,14 @@ import flet
 import pandas as pd
 import moviepy.editor as mp
 
+from typing import List
 from enum import Enum
 from pytube import YouTube
 from dataclasses import dataclass
-from flet import Page, UserControl, Row, Column, Image, Slider, Audio, IconButton, ListView, Text, PubSub
+from flet import Page, UserControl, Row, Column, Image, Slider, Audio, IconButton, ListView, ListTile, Text, PubSub
 
 
-@dataclass
+@dataclass(slots = True)
 class Song:
     title : str
     image : str
@@ -18,10 +19,12 @@ class Song:
 class Actions(Enum):
     NEXT_SONG : str = 'next'
     PREV_SONG : str = 'previous'
+    SEEK : str = 'seek'
 
 
 ICONS_PATH = r'C:\Users\sergi\Documents\repos\flet\course\playlist_player\assets\icons'
 SONGS_PATH = r'C:\Users\sergi\Documents\repos\flet\course\playlist_player\assets\songs'
+SONGS_DATABASE_PATH = r'C:\Users\sergi\Documents\repos\flet\course\playlist_player\assets\music.csv'
 
 PLAY_ICON_PATH = rf'{ICONS_PATH}\play.png'
 PAUSE_ICON_PATH = rf'{ICONS_PATH}\pause.png'
@@ -31,8 +34,7 @@ RANDOM_ICON_PATH = rf'{ICONS_PATH}\shuffle.png'
 LOOP_ONE_ICON_PATH = rf'{ICONS_PATH}\replay.png'
 LOOP_ALL_ICON_PATH = rf'{ICONS_PATH}\repeat.png'
 
-SONGS = pd.read_csv(r'C:\Users\sergi\Documents\repos\flet\course\playlist_player\assets\music.csv', index_col=0)
-
+SONGS : List[Song] = [ Song(**row) for _, row in pd.read_csv(SONGS_DATABASE_PATH, index_col = 0).iterrows() ]
 
 class SongPlayer(UserControl):
     def __init__(self, pubsub : PubSub, song : Song):
@@ -60,6 +62,10 @@ class SongPlayer(UserControl):
 
     def _set_state(self, event):
         self.current_state = event.data
+
+        if event.data == 'completed':
+            self.current_state = 'playing'
+            self.next_song(event)
 
     def _load_song(self):
         stream = YouTube(self.song.src).streams.filter(file_extension = 'mp4').first()
@@ -143,28 +149,83 @@ class SongPlayer(UserControl):
                  self.play_button,
                  self.pause_button,
                  self.next_button], alignment = 'center')
-        ], horizontal_alignment = 'center', width = 768)
+        ], horizontal_alignment = 'center', width = 512 + 128)
 
 
-class PlaylistPlayer(UserControl):
-    def __init__(self, pubsub : PubSub, songs : pd.DataFrame):
+class Playlist(UserControl):
+    def __init__(self, pubsub : PubSub, songs : List[Song], title : str, hinted_song : int = 0):
         super().__init__()
 
-        self.songs : pd.DataFrame = songs
+        self.title = title
+        self.pubsub : PubSub = pubsub
+        self.songs : List[Song] = songs
+        self.hinted_song : int = hinted_song
+
+        self.random_button : IconButton = IconButton(content = Image(RANDOM_ICON_PATH), width = 40, 
+                                                    height = 40, on_click = self.random_action)
+        self.loop_current_button : IconButton = IconButton(content = Image(LOOP_ONE_ICON_PATH), width = 40, 
+                                                       height = 40, on_click = self.loop_current_action)
+        self.loop_all_button : IconButton = IconButton(content = Image(LOOP_ALL_ICON_PATH), width = 40, 
+                                                   height = 40, on_click = self.loop_all_action)
+        self.songs_list = ListView( [ListTile(leading = Image(src = song.image, width = 64, height = 64, border_radius = flet.border_radius.all(10)),
+                                              title = Text(song.title, size = 12, weight = 'bold', no_wrap = False), 
+                                              selected = idx == self.hinted_song, key = idx, on_click = self.select_song) for idx, song in enumerate(self.songs)], height = 512 - 128 - 16, spacing = 8 )
+
+    def select_song(self, event):
+        self.hint_song(event.control.key)
+        self.pubsub.send_all_on_topic(Actions.SEEK, event.control.key)
+
+    def hint_song(self, song_index : int):
+        self.songs_list.controls[self.hinted_song].selected = False
+        self.hinted_song = song_index
+        self.songs_list.controls[self.hinted_song].selected = True
+        self.update()
+
+    def random_action(self, event):
+        pass
+    
+    def loop_current_action(self, event):
+        pass
+    
+    def loop_all_action(self, event):
+        pass
+
+    def build(self):
+        return Column(controls = [
+            Text(self.title, style = flet.TextThemeStyle.TITLE_MEDIUM),
+            Row([self.random_button, self.loop_current_button, self.loop_all_button]),
+            self.songs_list
+        ], width = 256 + 128 - 64)
+        
+
+class PlaylistPlayer(UserControl):
+    def __init__(self, pubsub : PubSub, songs : List[Song]):
+        super().__init__()
+
+        self.songs : List[Song] = songs
         self.pubsub : PubSub = pubsub
         self.current_song_index = 0
 
         self.song_player : SongPlayer = SongPlayer(self.pubsub, self._get_song())
+        self.playlist : Playlist = Playlist(self.pubsub, self.songs, 'Demo Playlist', self.current_song_index)
 
         self.pubsub.subscribe_topic(Actions.NEXT_SONG, self._change_song)
         self.pubsub.subscribe_topic(Actions.PREV_SONG, self._change_song)
+        self.pubsub.subscribe_topic(Actions.SEEK, self._seek_song)
 
+    def _seek_song(self, topic : Actions, message : int):
+        self.current_song_index = message
+        self.song_player.set_song(self._get_song())
+        self.playlist.hint_song(self.current_song_index)
+        self.song_player.play(None)
+        self.update()
 
-    def _change_song(self, topic, message):
+    def _change_song(self, topic : Actions, message):
         direction : int = 1 if topic == Actions.NEXT_SONG else - 1
 
         self.current_song_index = (self.current_song_index + direction) % len(self.songs)
         self.song_player.set_song(self._get_song())
+        self.playlist.hint_song(self.current_song_index)
 
         if self.song_player.current_state == 'playing':
             self.song_player.play(None)
@@ -172,10 +233,10 @@ class PlaylistPlayer(UserControl):
         self.update()
 
     def _get_song(self) -> Song:
-        return Song(**self.songs.iloc[self.current_song_index].to_dict())
+        return self.songs[self.current_song_index]
 
     def build(self):
-        return Row([self.song_player, ListView(width = 256)])
+        return Row([self.song_player, self.playlist], wrap = True)
 
 
 def main(page : Page):    
@@ -185,8 +246,7 @@ def main(page : Page):
     page.window_resizable = False
     page.window_left = 128
     page.window_top = 64
-
-    page.vertical_alignment = 'center'
+    page.scroll = 'always'
 
     page.add(PlaylistPlayer(page.pubsub, SONGS))
 
