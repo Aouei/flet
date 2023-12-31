@@ -1,6 +1,7 @@
 import flet
 import pandas as pd
 import moviepy.editor as mp
+import numpy as np
 
 from typing import List
 from enum import Enum
@@ -31,8 +32,11 @@ PAUSE_ICON_PATH = rf'{ICONS_PATH}\pause.png'
 PREVIOUS_ICON_PATH = rf'{ICONS_PATH}\previous.png'
 NEXT_ICON_PATH = rf'{ICONS_PATH}\next.png'
 RANDOM_ICON_PATH = rf'{ICONS_PATH}\shuffle.png'
+RANDOM_SELECTED_ICON_PATH = rf'{ICONS_PATH}\shuffle_selected.gif'
 LOOP_ONE_ICON_PATH = rf'{ICONS_PATH}\replay.png'
+LOOP_ONE_SELECTED_ICON_PATH = rf'{ICONS_PATH}\replay_selected.gif'
 LOOP_ALL_ICON_PATH = rf'{ICONS_PATH}\repeat.png'
+LOOP_ALL_SELECTED_ICON_PATH = rf'{ICONS_PATH}\repeat_selected.gif'
 
 SONGS : List[Song] = [ Song(**row) for _, row in pd.read_csv(SONGS_DATABASE_PATH, index_col = 0).iterrows() ]
 
@@ -159,6 +163,7 @@ class PlaylistPlayer(UserControl):
         self.songs : List[Song] = songs
         self.pubsub : PubSub = pubsub
         self.current_song_index = 0
+        self.indexes : np.array = np.arange(len(self.songs))
 
         self.song_player : SongPlayer = SongPlayer(self.pubsub, self._get_song())
 
@@ -173,7 +178,9 @@ class PlaylistPlayer(UserControl):
                                                    height = 40, on_click = self.loop_all_action)
         self.songs_list = ListView( [ListTile(leading = Image(src = song.image, width = 64, height = 64, border_radius = flet.border_radius.all(10)),
                                               title = Text(song.title, size = 12, weight = 'bold', no_wrap = False), 
-                                              selected = idx == self.current_song_index, key = idx, on_click = self.select_song) for idx, song in enumerate(self.songs)], height = 512 - 128 - 16, spacing = 8 )
+                                              selected = idx == self.current_song_index, 
+                                              key = idx, on_click = lambda event : self.select_song(event.control.key)) 
+                                              for idx, song in enumerate(self.songs)], height = 512 - 128 - 16, spacing = 8 )
 
         self.playlist = Column(controls = [
             Text(self.title, style = flet.TextThemeStyle.TITLE_MEDIUM),
@@ -184,10 +191,7 @@ class PlaylistPlayer(UserControl):
         self.pubsub.subscribe_topic(Actions.NEXT_SONG, self._change_song)
         self.pubsub.subscribe_topic(Actions.PREV_SONG, self._change_song)
 
-    def select_song(self, event):
-        self.hint_song(event.control.key)
-
-    def hint_song(self, song_index : int):
+    def select_song(self, song_index : int):
         self.songs_list.controls[self.current_song_index].selected = False
         self.current_song_index = song_index
         self.songs_list.controls[self.current_song_index].selected = True
@@ -195,20 +199,44 @@ class PlaylistPlayer(UserControl):
         self.update()
 
     def random_action(self, event):
-        pass
+        if event.control.selected:
+            event.control.selected = False
+            event.control.content = Image(RANDOM_ICON_PATH)
+        else:
+            event.control.content = Image(RANDOM_SELECTED_ICON_PATH)
+            event.control.selected = True
+        self.update()
     
     def loop_current_action(self, event):
-        pass
+        if event.control.selected:
+            event.control.selected = False
+            event.control.content = Image(LOOP_ONE_ICON_PATH)
+        else:
+            event.control.content = Image(LOOP_ONE_SELECTED_ICON_PATH)
+            event.control.selected = True
+            self.loop_all_button.content = Image(LOOP_ALL_ICON_PATH)
+            self.loop_all_button.selected = False
+        self.update()
     
     def loop_all_action(self, event):
-        pass
+        if event.control.selected:
+            event.control.selected = False
+            event.control.content = Image(LOOP_ALL_ICON_PATH)
+        else:
+            event.control.content = Image(LOOP_ALL_SELECTED_ICON_PATH)
+            event.control.selected = True
+            self.loop_current_button.content = Image(LOOP_ONE_ICON_PATH)
+            self.loop_current_button.selected = False
+        self.update()
 
     def _change_song(self, topic : Actions, message):
         direction : int = 1 if topic == Actions.NEXT_SONG else - 1
 
-        self.current_song_index = (self.current_song_index + direction) % len(self.songs)
+        if self.random_button.selected:
+            self.select_song(np.random.choice(self.indexes, 1)[0])
+        else:
+            self.select_song((self.current_song_index + direction) % len(self.songs))
         self.song_player.set_song(self._get_song())
-        self.hint_song(self.current_song_index)
 
         if self.song_player.current_state == 'playing':
             self.song_player.play(None)
