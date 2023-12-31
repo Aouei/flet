@@ -152,14 +152,18 @@ class SongPlayer(UserControl):
         ], horizontal_alignment = 'center', width = 512 + 128)
 
 
-class Playlist(UserControl):
-    def __init__(self, pubsub : PubSub, songs : List[Song], title : str, hinted_song : int = 0):
+class PlaylistPlayer(UserControl):
+    def __init__(self, pubsub : PubSub, songs : List[Song]):
         super().__init__()
 
-        self.title = title
-        self.pubsub : PubSub = pubsub
         self.songs : List[Song] = songs
-        self.hinted_song : int = hinted_song
+        self.pubsub : PubSub = pubsub
+        self.current_song_index = 0
+
+        self.song_player : SongPlayer = SongPlayer(self.pubsub, self._get_song())
+
+        self.title : str = 'Demo Playlist'
+        self.pubsub : PubSub = pubsub
 
         self.random_button : IconButton = IconButton(content = Image(RANDOM_ICON_PATH), width = 40, 
                                                     height = 40, on_click = self.random_action)
@@ -169,16 +173,25 @@ class Playlist(UserControl):
                                                    height = 40, on_click = self.loop_all_action)
         self.songs_list = ListView( [ListTile(leading = Image(src = song.image, width = 64, height = 64, border_radius = flet.border_radius.all(10)),
                                               title = Text(song.title, size = 12, weight = 'bold', no_wrap = False), 
-                                              selected = idx == self.hinted_song, key = idx, on_click = self.select_song) for idx, song in enumerate(self.songs)], height = 512 - 128 - 16, spacing = 8 )
+                                              selected = idx == self.current_song_index, key = idx, on_click = self.select_song) for idx, song in enumerate(self.songs)], height = 512 - 128 - 16, spacing = 8 )
+
+        self.playlist = Column(controls = [
+            Text(self.title, style = flet.TextThemeStyle.TITLE_MEDIUM),
+            Row([self.random_button, self.loop_current_button, self.loop_all_button]),
+            self.songs_list
+        ], width = 256 + 128 - 64)
+
+        self.pubsub.subscribe_topic(Actions.NEXT_SONG, self._change_song)
+        self.pubsub.subscribe_topic(Actions.PREV_SONG, self._change_song)
 
     def select_song(self, event):
         self.hint_song(event.control.key)
-        self.pubsub.send_all_on_topic(Actions.SEEK, event.control.key)
 
     def hint_song(self, song_index : int):
-        self.songs_list.controls[self.hinted_song].selected = False
-        self.hinted_song = song_index
-        self.songs_list.controls[self.hinted_song].selected = True
+        self.songs_list.controls[self.current_song_index].selected = False
+        self.current_song_index = song_index
+        self.songs_list.controls[self.current_song_index].selected = True
+        self.song_player.set_song(self._get_song())
         self.update()
 
     def random_action(self, event):
@@ -190,42 +203,12 @@ class Playlist(UserControl):
     def loop_all_action(self, event):
         pass
 
-    def build(self):
-        return Column(controls = [
-            Text(self.title, style = flet.TextThemeStyle.TITLE_MEDIUM),
-            Row([self.random_button, self.loop_current_button, self.loop_all_button]),
-            self.songs_list
-        ], width = 256 + 128 - 64)
-        
-
-class PlaylistPlayer(UserControl):
-    def __init__(self, pubsub : PubSub, songs : List[Song]):
-        super().__init__()
-
-        self.songs : List[Song] = songs
-        self.pubsub : PubSub = pubsub
-        self.current_song_index = 0
-
-        self.song_player : SongPlayer = SongPlayer(self.pubsub, self._get_song())
-        self.playlist : Playlist = Playlist(self.pubsub, self.songs, 'Demo Playlist', self.current_song_index)
-
-        self.pubsub.subscribe_topic(Actions.NEXT_SONG, self._change_song)
-        self.pubsub.subscribe_topic(Actions.PREV_SONG, self._change_song)
-        self.pubsub.subscribe_topic(Actions.SEEK, self._seek_song)
-
-    def _seek_song(self, topic : Actions, message : int):
-        self.current_song_index = message
-        self.song_player.set_song(self._get_song())
-        self.playlist.hint_song(self.current_song_index)
-        self.song_player.play(None)
-        self.update()
-
     def _change_song(self, topic : Actions, message):
         direction : int = 1 if topic == Actions.NEXT_SONG else - 1
 
         self.current_song_index = (self.current_song_index + direction) % len(self.songs)
         self.song_player.set_song(self._get_song())
-        self.playlist.hint_song(self.current_song_index)
+        self.hint_song(self.current_song_index)
 
         if self.song_player.current_state == 'playing':
             self.song_player.play(None)
