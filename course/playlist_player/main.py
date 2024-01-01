@@ -2,6 +2,8 @@ import flet
 import pandas as pd
 import moviepy.editor as mp
 import numpy as np
+import hashlib
+import os
 
 from typing import List
 from enum import Enum
@@ -72,14 +74,16 @@ class SongPlayer(UserControl):
             self.next_song(event)
 
     def _load_song(self):
-        stream = YouTube(self.song.src).streams.filter(file_extension = 'mp4').first()
-        result = stream.download(output_path = SONGS_PATH)
-        mp3_file = ''
+        hash_code = hashlib.sha256(self.song.title.encode('utf-8')).hexdigest()    
+        mp3_file = os.path.join(SONGS_PATH, f'{hash_code}.mp3')
 
-        if not result == '':
-            clip = mp.VideoFileClip(result)
-            mp3_file = result.replace('.mp4', '.mp3')
-            clip.audio.write_audiofile(mp3_file)
+        if not os.path.exists(mp3_file):
+            stream = YouTube(self.song.src).streams.filter(file_extension = 'mp4').first()
+            result = stream.download(output_path = SONGS_PATH, filename = f'{hash_code}.mp4')
+
+            if not result == '':
+                clip = mp.VideoFileClip(result)
+                clip.audio.write_audiofile(mp3_file)
 
         return mp3_file
 
@@ -164,6 +168,7 @@ class PlaylistPlayer(UserControl):
         self.pubsub : PubSub = pubsub
         self.current_song_index = 0
         self.indexes : np.array = np.arange(len(self.songs))
+        np.random.shuffle(self.indexes)
 
         self.song_player : SongPlayer = SongPlayer(self.pubsub, self._get_song())
 
@@ -233,12 +238,12 @@ class PlaylistPlayer(UserControl):
         direction : int = 1 if topic == Actions.NEXT_SONG else - 1
 
         if self.random_button.selected:
-            self.select_song(np.random.choice(self.indexes, 1)[0])
+            self.select_song(self.indexes[(self.current_song_index + direction) % len(self.songs)])
         else:
             self.select_song((self.current_song_index + direction) % len(self.songs))
         self.song_player.set_song(self._get_song())
 
-        if self.song_player.current_state == 'playing':
+        if self.song_player.current_state != 'pause':
             self.song_player.play(None)
         
         self.update()
