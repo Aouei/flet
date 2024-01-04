@@ -25,6 +25,10 @@ class Actions(Enum):
     SEEK : str = 'seek'
 
 
+class States(Enum):
+    COMPLETED : str = 'completed'
+
+
 ICONS_PATH = r'C:\Users\sergi\Documents\repos\flet\course\playlist_player\assets\icons'
 SONGS_PATH = r'C:\Users\sergi\Documents\repos\flet\course\playlist_player\assets\songs'
 SONGS_DATABASE_PATH = r'C:\Users\sergi\Documents\repos\flet\course\playlist_player\assets\music.csv'
@@ -70,8 +74,7 @@ class SongPlayer(UserControl):
         self.current_state = event.data
 
         if event.data == 'completed':
-            self.current_state = 'playing'
-            self.next_song(event)
+            self.pubsub.send_all_on_topic(States.COMPLETED, '')
 
     def _load_song(self):
         hash_code = hashlib.sha256(self.song.title.encode('utf-8')).hexdigest()    
@@ -195,6 +198,7 @@ class PlaylistPlayer(UserControl):
 
         self.pubsub.subscribe_topic(Actions.NEXT_SONG, self._change_song)
         self.pubsub.subscribe_topic(Actions.PREV_SONG, self._change_song)
+        self.pubsub.subscribe_topic(States.COMPLETED, self._finished_song)
 
     def select_song(self, song_index : int):
         self.songs_list.controls[self.current_song_index].selected = False
@@ -233,6 +237,12 @@ class PlaylistPlayer(UserControl):
             self.loop_current_button.content = Image(LOOP_ONE_ICON_PATH)
             self.loop_current_button.selected = False
         self.update()
+
+    def _finished_song(self, topic : States, message):
+        if self.loop_current_button.selected:
+            self.song_player.play(None)
+        elif self.loop_all_button.selected or self.current_song_index != len(self.songs):
+            self._change_song(Actions.NEXT_SONG, '')
 
     def _change_song(self, topic : Actions, message):
         direction : int = 1 if topic == Actions.NEXT_SONG else - 1
