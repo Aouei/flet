@@ -9,7 +9,7 @@ from typing import List
 from enum import Enum
 from pytube import YouTube
 from dataclasses import dataclass
-from flet import Page, UserControl, Row, Column, Image, Slider, Audio, IconButton, ListView, ListTile, Text, PubSub
+from flet import Page, UserControl, Row, Column, Image, Slider, Audio, IconButton, ListView, ListTile, Text, PubSub, ResponsiveRow
 
 
 @dataclass(slots = True)
@@ -151,6 +151,8 @@ class SongPlayer(UserControl):
         self.pubsub.send_all_on_topic(Actions.PREV_SONG, '')
 
     def build(self):
+        self.col = {'xs' : 12, 'md' : 9}
+
         return Column([
             self.audio,
             self.title,
@@ -160,7 +162,7 @@ class SongPlayer(UserControl):
                  self.play_button,
                  self.pause_button,
                  self.next_button], alignment = 'center')
-        ], horizontal_alignment = 'center', width = 512 + 128)
+        ], horizontal_alignment = 'center')
 
 
 class PlaylistPlayer(UserControl):
@@ -188,13 +190,13 @@ class PlaylistPlayer(UserControl):
                                               title = Text(song.title, size = 12, weight = 'bold', no_wrap = False), 
                                               selected = idx == self.current_song_index, 
                                               key = idx, on_click = lambda event : self.select_song(event.control.key)) 
-                                              for idx, song in enumerate(self.songs)], height = 512 - 128 - 16, spacing = 8 )
+                                              for idx, song in enumerate(self.songs)], spacing = 8)
 
         self.playlist = Column(controls = [
             Text(self.title, style = flet.TextThemeStyle.TITLE_MEDIUM),
             Row([self.random_button, self.loop_current_button, self.loop_all_button]),
             self.songs_list
-        ], width = 256 + 128 - 64)
+        ], col = {'xs' : 12, 'md' : 3}, expand = True)
 
         self.pubsub.subscribe_topic(Actions.NEXT_SONG, self._change_song)
         self.pubsub.subscribe_topic(Actions.PREV_SONG, self._change_song)
@@ -262,14 +264,13 @@ class PlaylistPlayer(UserControl):
         return self.songs[self.current_song_index]
 
     def build(self):
-        return Row([self.song_player, self.playlist], wrap = True)
+        return ResponsiveRow([self.song_player, self.playlist])
 
 
 def main(page : Page):    
     page.title = 'Playlist Player'
     page.window_width = 1024
     page.window_height = 512
-    page.window_resizable = False
     page.window_left = 128
     page.window_top = 64
     page.scroll = 'always'
