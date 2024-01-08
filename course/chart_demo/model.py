@@ -114,12 +114,53 @@ class Room: # Create a Door Class
 
         return list(set(points))
     
-    def join_room(self, origin : Direction, destiny : List[Tuple[int, int]]) -> None:
+    def join_room_random(self, origin : Direction, destiny : List[Tuple[int, int]]) -> None:
         origin_start, origin_end = self.doors[origin.value][0], self.doors[origin.value][-1]
         destiny_start, destiny_end = destiny[0], destiny[-1]
 
         self.tunnels[origin.value] = self.__join_points(origin_start, destiny_end, []) + \
                                     self.__join_points(origin_end, destiny_start, [])
+        
+    def join_room(self, origin : Direction, destiny : List[Tuple[int, int]]) -> None:
+        origin_start, origin_end = self.doors[origin.value][0], self.doors[origin.value][-1]
+        destiny_start, destiny_end = destiny[0], destiny[-1]
+
+        if origin == Direction.SOUTH:
+            p1, p2 = origin_end, destiny_start
+            p3, p4 = origin_start, destiny_end
+            dir_x, dir_y = 1, 1
+        elif origin == Direction.WEST:
+            p1, p2 = destiny_start, origin_end
+            p3, p4 = destiny_end, origin_start
+            dir_x, dir_y = 1, 1
+        elif origin == Direction.NORTH:
+            p1, p2 = origin_end, destiny_start
+            p3, p4 = origin_start, destiny_end
+            dir_x, dir_y = -1, -1
+        elif origin == Direction.EAST:
+            p1, p2 = destiny_start, origin_end
+            p3, p4 = destiny_end, origin_start
+            dir_x, dir_y = -1, -1
+
+
+        self.tunnels[origin.value] = []
+        current_x, current_y = p1
+        for dy in range(abs(p1[1] - p2[1])):
+            current_y += dir_y
+            self.tunnels[origin.value].append( (current_x, current_y) )
+            
+        for dx in range(abs(p1[0] - p2[0])):
+            current_x += dir_x
+            self.tunnels[origin.value].append( (current_x, current_y) )
+
+        current_x, current_y = p3
+        for dy in range(abs(p3[1] - p4[1])):
+            current_y += dir_y
+            self.tunnels[origin.value].append( (current_x, current_y) )
+
+        for dx in range(abs(p3[0] - p4[0])):
+            current_x += dir_x
+            self.tunnels[origin.value].append( (current_x, current_y) )
         
     def get_data(self) -> Mapping[str, List[Tuple[int, int]]]:
         points = {

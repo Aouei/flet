@@ -85,7 +85,7 @@ class HabList(UserControl):
         
     def open_door(self, event):
         if self.uuids.value and self.directions.value:
-            self.game_map.create_room_doors(self.uuids.value, [Direction(self.directions.value)], [10])
+            self.game_map.create_room_doors(self.uuids.value, [Direction(self.directions.value)], [4])
             self.pubsub.send_all(self.game_map)
 
     def join_rooms(self, event):
