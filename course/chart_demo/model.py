@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import numpy as np
 
-from typing import List, Tuple, Mapping
+from typing import List, Tuple, Mapping, Any
 from enums import Direction
 
 
@@ -23,6 +23,14 @@ class Room: # Create a Door Class
 
         for direction in Direction:
             self.set_door(direction, 0)
+
+    def get_metadata(self) -> Mapping[str, Any]:
+        return {
+            'x' : self.x,
+            'y' : self.y,
+            'height' : self.height,
+            'width' : self.width,
+        }
 
     @property
     def uuid(self):
@@ -153,6 +161,9 @@ class MapBuilder:
     def get_room_data(self, uuid : str) -> Mapping[str, List[Tuple[int, int]]]:
         return self.rooms[uuid].get_data()
 
+    def get_room_metadata(self, uuid : str) -> Mapping[str, Any]:
+        return self.rooms[uuid].get_metadata()
+
     def get_room_uuids(self) -> List[str]:
         return list(self.rooms.keys())
 
@@ -161,7 +172,7 @@ class MapBuilder:
             points = np.array(points)
         
             if len(points):
-                ax.scatter(points[:, 0], points[:, 1], s = 5)
+                ax.scatter(points[:, 0], points[:, 1], s = 1, c = 'b')
             
         return ax
 
