@@ -54,13 +54,15 @@ class HabList(UserControl):
 
         self.uuids_1 : Dropdown = Dropdown(options = [], width = 96)
         self.uuids_2 : Dropdown = Dropdown(options = [], width = 96)
-        self.directions_1 : Dropdown = Dropdown(options = [dropdown.Option(direction.value, text = direction.name) for direction in Direction], width = 96)
-        self.directions_2 : Dropdown = Dropdown(options = [dropdown.Option(direction.value, text = direction.name) for direction in Direction], width = 96)
+        self.directions_1 : Dropdown = Dropdown(options = [dropdown.Option(text = 'N-E'), 
+                                                           dropdown.Option(text = 'E-N'), 
+                                                           dropdown.Option(text = 'S-W'),
+                                                           dropdown.Option(text = 'W-S')], width = 96)
 
         self.buttons : Column = Column([
             Row([ElevatedButton('New Hab', on_click = self.new_hab), self.x_offset, self.y_offset, self.w_offset, self.h_offset]),
             Row([ElevatedButton('Open Door', on_click = self.open_door), self.uuids, self.directions]),
-            Row([ElevatedButton('Join Rooms', on_click = self.join_rooms), self.uuids_1, self.directions_1, self.uuids_2, self.directions_2], wrap = True),
+            Row([ElevatedButton('Join Rooms', on_click = self.join_rooms), self.uuids_1, self.uuids_2, self.directions_1], wrap = True),
         ])
 
     def new_hab(self, event):
@@ -89,8 +91,12 @@ class HabList(UserControl):
             self.pubsub.send_all(self.game_map)
 
     def join_rooms(self, event):
-        if self.uuids_1.value and self.directions_1.value and self.uuids_2.value and self.directions_2.value:
-            self.game_map.join_rooms(self.uuids_1.value, self.uuids_2.value, Direction(self.directions_1.value), Direction(self.directions_2.value))
+        if self.uuids_1.value and self.uuids_2.value and self.directions_1.value:
+            direction_1, direction_2 = self.directions_1.value.split('-')
+            direction_1 = Direction(direction_1)
+            direction_2 = Direction(direction_2)
+
+            self.game_map.join_rooms(self.uuids_1.value, self.uuids_2.value, direction_1, direction_2)
             self.pubsub.send_all(self.game_map)
 
     def _update_layout(self):
